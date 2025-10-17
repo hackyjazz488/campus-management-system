@@ -1,62 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Calendar with Events</title>
+    <title>Simple Calendar</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            margin: 50px;
-            background: url("cc.jpg") fixed center no-repeat;
-            background-size: cover;
-            
-
+            background-color: #f9f9f9;
+            margin: 40px;
         }
-
         h1 {
-            color: white;
-            text-shadow: 2px 2px 4px #000000;
+            color: #333;
         }
         table {
-            width: 100%;
+            width: 80%;
+            margin: 20px auto;
             border-collapse: collapse;
-            margin-top: 20px;
-            background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white background for better readability */
         }
-
         th, td {
             padding: 10px;
-            border: 1px solid #ddd;
-            color: black;
+            border: 1px solid #aaa;
         }
         th {
-            background-color: #f2f2f2;
+            background-color: #ddd;
         }
-        .event-cell {
-            background-color: #aaffaa; /* Light green background for cells with events */
-        }
-        .event-name, label, input {
-        color: black; /* Set text color to white */
-    }
-        .event-name {
-            font-weight: bold;
-            
+        .event {
+            background-color: #b2fab4;
         }
         form {
             margin-top: 20px;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
         input {
+            margin: 5px;
             padding: 5px;
-            margin-bottom: 10px;
-            color: black;
         }
         input[type="submit"] {
             background-color: #4caf50;
-            color: black;
+            color: white;
+            border: none;
             cursor: pointer;
         }
         input[type="submit"]:hover {
@@ -66,158 +47,92 @@
 </head>
 <body>
 
-    <h1><b>Calendar with Events</b></h1>
+<h1>Simple Calendar with Events</h1>
 
+<?php
+// Database connection
+function createConnection() {
+    $db = new mysqli("localhost", "root", "", "campus");
+    if ($db->connect_error) die("Connection failed: " . $db->connect_error);
+    return $db;
+}
 
-    <?php
-    // Function to create a MySQLi connection
-    function createConnection() {
-        $servername = "localhost";
-        $username = "root";
-        $password = "";
-        $dbname = "campus";
+// Add event
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = $_POST['eventTitle'];
+    $start = $_POST['eventStartDate'];
+    $end = $_POST['eventEndDate'];
 
-        $db = new mysqli($servername, $username, $password, $dbname);
+    $db = createConnection();
+    $stmt = $db->prepare("INSERT INTO calendar_event_master (event_title, event_date, event_end_date) VALUES (?, ?, ?)");
+    $stmt->bind_param("sss", $title, $start, $end);
+    $stmt->execute();
+    $stmt->close();
+    $db->close();
+    echo "<p style='color:green;'>Event added successfully!</p>";
+}
 
-        if ($db->connect_error) {
-            die("Connection failed: " . $db->connect_error);
-        }
-
-        return $db;
-    }
-
-    // Function to add an event to the database
-    function addEventToDatabase($title, $startDate, $endDate, $db) {
-        // Use prepared statements to prevent SQL injection
-        $stmt = $db->prepare("INSERT INTO calendar_event_master (event_title, event_date, event_end_date) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $title, $startDate, $endDate);
-
-        if ($stmt->execute()) {
-            echo "Event added successfully";
-        } else {
-            echo "Error: " . $stmt->error;
-        }
-
-        $stmt->close();
-        $db->close();
-    }
-
-    // Function to get events from the database
-function getEventsFromDatabase($db) {
-    $events = array();
-
-    $sql = "SELECT event_date, event_end_date, event_title FROM calendar_event_master";
-    $result = $db->query($sql);
-
-    if ($result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $events[] = $row;
-        }
-    }
-
+// Fetch events
+function getEvents() {
+    $db = createConnection();
+    $result = $db->query("SELECT event_title, event_date, event_end_date FROM calendar_event_master");
+    $events = [];
+    while ($row = $result->fetch_assoc()) $events[] = $row;
+    $db->close();
     return $events;
 }
 
+$month = date('n');
+$year = date('Y');
+$events = getEvents();
 
-       // Function to determine the cell class and get event name based on events
-function getCellClass($day, $events) {
-    global $year, $month; // Declare $year as global
+echo "<h2>" . date('F Y') . "</h2>";
 
-    foreach ($events as $event) {
-        $startDate = strtotime($event['event_date']);
-        $endDate = strtotime($event['event_end_date']);
+echo "<table>";
+echo "<tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>";
 
-        // Convert $day to a timestamp for comparison
-        $currentDayTimestamp = strtotime("$year-$month-$day");
+$firstDay = date('w', strtotime("$year-$month-01"));
+$totalDays = date('t', strtotime("$year-$month-01"));
+$day = 1;
 
-        if ($currentDayTimestamp >= $startDate && $currentDayTimestamp <= $endDate) {
-            return isset($event['event_title']) ? $event['event_title'] : '';
-        }
-    }
-    return '';
-}
-
-
-
-
-
-    // Check if the form is submitted
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Retrieve form data
-        $eventTitle = $_POST['eventTitle'];
-        $eventStartDate = $_POST['eventStartDate'];
-        $eventEndDate = $_POST['eventEndDate'];
-
-        // Create a connection
-        $db = createConnection();
-
-        // Add the event to the database
-        addEventToDatabase($eventTitle, $eventStartDate, $eventEndDate, $db);
-    }
-
-    // Get the current month and year
-    $month = date('n');
-    $year = date('Y');
-
-    // Get events from the database
-    $events = getEventsFromDatabase(createConnection());
-
-    // Output the month and year
-    echo "<h2>" . date('F Y', strtotime("$year-$month-01")) . "</h2>";
-
-    // Output the calendar table
-    echo "<table>";
+for ($row = 0; $row < 6; $row++) {
     echo "<tr>";
-    echo "<th>Sun</th>";
-    echo "<th>Mon</th>";
-    echo "<th>Tue</th>";
-    echo "<th>Wed</th>";
-    echo "<th>Thu</th>";
-    echo "<th>Fri</th>";
-    echo "<th>Sat</th>";
-    echo "</tr>";
-
-    // Get the first day of the month and the total number of days in the month
-    $firstDay = date('w', strtotime("$year-$month-01"));
-    $totalDays = date('t', strtotime("$year-$month-01"));
-
-    // Initialize variables
-    $dayCount = 1;
-    $currentDay = 1;
-
-    // Output the calendar rows
-    for ($row = 0; $row < 6; $row++) {
-        echo "<tr>";
-        for ($col = 0; $col < 7; $col++) {
-            $cellClass = '';
-            $eventName = getCellClass($currentDay, $events);
-            if ($dayCount > $firstDay && $currentDay <= $totalDays) {
-                $cellClass = $eventName ? 'event-cell' : '';
-                echo "<td class='$cellClass'>$currentDay<br><span class='event-name'>$eventName</span></td>";
-                $currentDay++;
-            } else {
-                echo "<td></td>";
+    for ($col = 0; $col < 7; $col++) {
+        if ($row == 0 && $col < $firstDay || $day > $totalDays) {
+            echo "<td></td>";
+        } else {
+            $hasEvent = '';
+            $eventTitle = '';
+            foreach ($events as $event) {
+                $start = strtotime($event['event_date']);
+                $end = strtotime($event['event_end_date']);
+                $current = strtotime("$year-$month-$day");
+                if ($current >= $start && $current <= $end) {
+                    $hasEvent = 'event';
+                    $eventTitle = $event['event_title'];
+                    break;
+                }
             }
-            $dayCount++;
+            echo "<td class='$hasEvent'>$day<br><small>$eventTitle</small></td>";
+            $day++;
         }
-        echo "</tr>";
     }
+    echo "</tr>";
+}
+echo "</table>";
+?>
 
-    echo "</table>";
-    ?>
+<form method="post" action="">
+    <label>Event Title:</label><br>
+    <input type="text" name="eventTitle" required><br>
+    <label>Start Date:</label><br>
+    <input type="date" name="eventStartDate" required><br>
+    <label>End Date:</label><br>
+    <input type="date" name="eventEndDate"><br>
+    <input type="submit" value="Add Event">
+</form>
 
-    <form method="post" action="">
-        <label for="eventTitle">Event Title:</label>
-        <input type="text" name="eventTitle" required>
-        <label for="eventStartDate">Event Start Date:</label>
-        <input type="date" name="eventStartDate" required>
-        <label for="eventEndDate">Event End Date:</label>
-        <input type="date" name="eventEndDate">
-        <input type="submit" value="Add Event">
-    </form>
-    <p>
-       <a href="index.php">back</a>
-    </p>
+<p><a href="index.php">Back</a></p>
 
 </body>
 </html>
